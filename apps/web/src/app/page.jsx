@@ -137,6 +137,12 @@ export default function HomePage() {
               >
                 History
               </a>
+              <a
+                href="/docs"
+                className="text-sm font-medium text-[#667085] hover:text-[#101828] transition-colors"
+              >
+                Docs
+              </a>
               {user ? (
                 <div className="flex items-center gap-4">
                   <span className="text-sm text-[#667085]">{user.email}</span>
@@ -181,6 +187,12 @@ export default function HomePage() {
                   className="text-sm font-medium text-[#667085] hover:text-[#101828] transition-colors"
                 >
                   History
+                </a>
+                <a
+                  href="/docs"
+                  className="text-sm font-medium text-[#667085] hover:text-[#101828] transition-colors"
+                >
+                  Docs
                 </a>
                 {user ? (
                   <>
