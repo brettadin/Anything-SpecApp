@@ -1,8 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { FileText, Menu, X, Download, Info, ArrowLeft } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import {
+  FileText,
+  Menu,
+  X,
+  Download,
+  Info,
+  ArrowLeft,
+  Database,
+  LineChart as LineChartIcon,
+  ArrowLeftRight,
+} from "lucide-react";
 import useUser from "@/utils/useUser";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function FileViewerPage({ params }) {
   const { data: user, loading: userLoading } = useUser();
@@ -11,12 +31,26 @@ export default function FileViewerPage({ params }) {
   const [error, setError] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
+  const [selectedYColumn, setSelectedYColumn] = useState(null);
+  const [unitMode, setUnitMode] = useState("original"); // 'original', 'wavelength', 'wavenumber'
 
   useEffect(() => {
     if (!userLoading && user && params.id) {
       fetchFile();
     }
   }, [user, userLoading, params.id]);
+
+  useEffect(() => {
+    // Set default Y column when file loads
+    if (
+      file &&
+      file.y_columns &&
+      file.y_columns.length > 0 &&
+      !selectedYColumn
+    ) {
+      setSelectedYColumn(file.y_columns[0]);
+    }
+  }, [file]);
 
   const fetchFile = async () => {
     try {
@@ -33,6 +67,75 @@ export default function FileViewerPage({ params }) {
       setLoading(false);
     }
   };
+
+  // Convert between wavelength (nm) and wavenumber (cm⁻¹)
+  const convertXValue = (value, fromMode, toMode) => {
+    if (fromMode === toMode) return value;
+
+    // Convert to wavelength (nm) first
+    let wavelengthNm = value;
+    if (fromMode === "wavenumber") {
+      // wavenumber (cm⁻¹) to wavelength (nm): λ = 10^7 / ν
+      wavelengthNm = 10000000 / value;
+    }
+
+    // Convert to target mode
+    if (toMode === "wavenumber") {
+      // wavelength (nm) to wavenumber (cm⁻¹): ν = 10^7 / λ
+      return 10000000 / wavelengthNm;
+    }
+
+    return wavelengthNm;
+  };
+
+  // Prepare chart data with unit conversion
+  const chartData = useMemo(() => {
+    if (!file || !file.full_data || !file.x_column || !selectedYColumn) {
+      return [];
+    }
+
+    const xCol = file.x_column;
+    const yCol = selectedYColumn;
+
+    // Detect original unit from x_column name and x_range
+    let originalMode = "original";
+    const xColLower = xCol.toLowerCase();
+    if (xColLower.includes("cm-1") || xColLower.includes("wavenumber")) {
+      originalMode = "wavenumber";
+    } else if (xColLower.includes("nm") || xColLower.includes("wavelength")) {
+      originalMode = "wavelength";
+    } else if (file.x_range) {
+      // Heuristic: if values are > 1000, likely wavenumbers (cm⁻¹)
+      // if values are < 1000, likely wavelengths (nm) or other units
+      const avgValue = (file.x_range.min + file.x_range.max) / 2;
+      if (avgValue > 1000) {
+        originalMode = "wavenumber";
+      } else if (avgValue > 100 && avgValue < 1000) {
+        originalMode = "wavelength";
+      }
+    }
+
+    return file.full_data
+      .map((row) => {
+        const xValue = row[xCol];
+        const yValue = row[yCol];
+        if (typeof xValue !== "number" || typeof yValue !== "number") {
+          return null;
+        }
+
+        let displayX = xValue;
+        if (unitMode !== "original" && originalMode !== "original") {
+          displayX = convertXValue(xValue, originalMode, unitMode);
+        }
+
+        return {
+          x: displayX,
+          y: yValue,
+        };
+      })
+      .filter((d) => d !== null)
+      .sort((a, b) => a.x - b.x);
+  }, [file, selectedYColumn, unitMode]);
 
   const downloadCSV = () => {
     if (!file || !file.full_data) return;
@@ -251,6 +354,157 @@ export default function FileViewerPage({ params }) {
             </div>
           )}
         </div>
+
+        {/* Metadata Card */}
+        {file.spectral_metadata &&
+          Object.keys(file.spectral_metadata).length > 0 && (
+            <div className="bg-white rounded-xl border border-[#EAECF0] p-6 mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Database size={20} className="text-[#357AFF]" />
+                <h3 className="font-semibold text-[#101828]">File Metadata</h3>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(file.spectral_metadata).map(([key, value]) => (
+                  <div key={key} className="text-sm">
+                    <div className="text-[#667085] mb-1">{key}</div>
+                    <div className="text-[#101828] font-medium">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        {/* Spectral Plot */}
+        {file.x_column &&
+          file.y_columns &&
+          file.y_columns.length > 0 &&
+          chartData.length > 0 && (
+            <div className="bg-white rounded-xl border border-[#EAECF0] p-6 mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <LineChartIcon size={20} className="text-[#357AFF]" />
+                  <h3 className="font-semibold text-[#101828]">
+                    Spectral Data Plot
+                  </h3>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Y Column Selector */}
+                  {file.y_columns.length > 1 && (
+                    <select
+                      value={selectedYColumn || ""}
+                      onChange={(e) => setSelectedYColumn(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-[#D0D5DD] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#357AFF]"
+                    >
+                      {file.y_columns.map((col) => (
+                        <option key={col} value={col}>
+                          {col}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Unit Conversion Selector */}
+                  <div className="flex items-center gap-2">
+                    <ArrowLeftRight size={16} className="text-[#667085]" />
+                    <select
+                      value={unitMode}
+                      onChange={(e) => setUnitMode(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-[#D0D5DD] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#357AFF]"
+                    >
+                      <option value="original">Original Units</option>
+                      <option value="wavelength">Wavelength (nm)</option>
+                      <option value="wavenumber">Wavenumber (cm⁻¹)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Data Range Info */}
+              <div className="flex flex-wrap gap-6 text-sm text-[#667085] mb-6 pb-6 border-b border-[#EAECF0]">
+                {file.x_range && (
+                  <div>
+                    <span className="font-medium text-[#101828]">
+                      X Range:{" "}
+                    </span>
+                    {file.x_range.min.toFixed(2)} -{" "}
+                    {file.x_range.max.toFixed(2)} ({file.x_range.count} points)
+                  </div>
+                )}
+                {file.y_range && (
+                  <div>
+                    <span className="font-medium text-[#101828]">
+                      Y Range:{" "}
+                    </span>
+                    {file.y_range.min.toFixed(2)} -{" "}
+                    {file.y_range.max.toFixed(2)}
+                  </div>
+                )}
+                {chartData.length < file.row_count && (
+                  <div className="text-[#357AFF]">
+                    <Info size={14} className="inline mr-1" />
+                    Showing {chartData.length} of {file.row_count} points
+                    (downsampled for performance)
+                  </div>
+                )}
+              </div>
+
+              {/* Chart */}
+              <ResponsiveContainer width="100%" height={400}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#EAECF0" />
+                  <XAxis
+                    dataKey="x"
+                    stroke="#667085"
+                    tick={{ fontSize: 12 }}
+                    label={{
+                      value:
+                        unitMode === "wavelength"
+                          ? "Wavelength (nm)"
+                          : unitMode === "wavenumber"
+                            ? "Wavenumber (cm⁻¹)"
+                            : file.x_column,
+                      position: "insideBottom",
+                      offset: -5,
+                      style: { fontSize: 12, fill: "#667085" },
+                    }}
+                  />
+                  <YAxis
+                    dataKey="y"
+                    stroke="#667085"
+                    tick={{ fontSize: 12 }}
+                    label={{
+                      value: selectedYColumn || "Intensity",
+                      angle: -90,
+                      position: "insideLeft",
+                      style: { fontSize: 12, fill: "#667085" },
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "white",
+                      border: "1px solid #EAECF0",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    labelFormatter={(value) =>
+                      `${unitMode === "wavelength" ? "λ" : unitMode === "wavenumber" ? "ν" : "X"}: ${Number(value).toFixed(2)}`
+                    }
+                    formatter={(value) => [
+                      Number(value).toFixed(4),
+                      selectedYColumn,
+                    ]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="y"
+                    stroke="#357AFF"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
         {/* Data Table */}
         <div className="bg-white rounded-xl border border-[#EAECF0] overflow-hidden">

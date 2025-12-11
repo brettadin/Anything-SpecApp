@@ -25,7 +25,14 @@ export async function GET(request, { params }) {
         p.row_count,
         p.preview_data,
         p.full_data,
-        p.parsing_notes
+        p.parsing_notes,
+        p.metadata_rows,
+        p.spectral_metadata,
+        p.x_column,
+        p.y_columns,
+        p.x_range,
+        p.y_range,
+        p.data_start_row
       FROM uploaded_files f
       LEFT JOIN parsed_data p ON f.id = p.file_id
       WHERE f.id = ${id} AND f.user_id = ${session.user.id}

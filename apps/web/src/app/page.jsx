@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { Upload, FileText, Menu, X } from "lucide-react";
 import useUser from "@/utils/useUser";
+import useUpload from "@/utils/useUpload";
 
 export default function HomePage() {
   const { data: user, loading: userLoading } = useUser();
@@ -11,6 +12,7 @@ export default function HomePage() {
   const [error, setError] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const fileInputRef = useRef(null);
+  const [upload, { loading: uploadLoading }] = useUpload();
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -44,25 +46,59 @@ export default function HomePage() {
     setError(null);
 
     try {
-      // Create FormData to send file
-      const formData = new FormData();
-      formData.append("file", file);
+      // Upload file directly to storage (supports large files)
+      const { url, mimeType, error: uploadError } = await upload({ file });
 
-      // Send to backend using FormData
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: formData, // Don't set Content-Type header - browser will set it with boundary
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(
-          errorData.error ||
-            `Upload failed with status ${uploadResponse.status}`,
-        );
+      if (uploadError) {
+        throw new Error(uploadError);
       }
 
-      const result = await uploadResponse.json();
+      if (!url) {
+        throw new Error("No URL returned from upload");
+      }
+
+      console.log(`File uploaded to storage: ${url}`);
+
+      // Send file URL and metadata to backend for parsing
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fileUrl: url,
+          filename: file.name,
+          fileSize: file.size,
+          mimeType: mimeType || file.type || "text/plain",
+        }),
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        let errorMessage = `Upload failed with status ${response.status}`;
+
+        if (contentType && contentType.includes("application/json")) {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (parseErr) {
+            console.error("Failed to parse error response:", parseErr);
+          }
+        } else {
+          try {
+            const textError = await response.text();
+            if (textError && textError.length < 500) {
+              errorMessage = textError;
+            }
+          } catch (textErr) {
+            console.error("Failed to read error text:", textErr);
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
 
       // Redirect to file viewer
       window.location.href = `/file/${result.fileId}`;
