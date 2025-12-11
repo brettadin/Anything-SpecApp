@@ -1,0 +1,150 @@
+Below is a suggested list of libraries and tools to use
+📋 Comprehensive Library List
+🔬 Spectroscopy-Specific (JavaScript/Node.js)
+Already Mentioned:
+	• papaparse - Superior CSV/TSV parsing with streaming support
+	• jcamp / jcampReader - Industry standard for JCAMP-DX format (IR, NMR, UV-Vis, ESR/EPR)
+	• fitsjs (astrojs/fitsjs) - JavaScript library for FITS astronomical format
+	• fits.js / fitsjs - For NASA's astronomical FITS data format
+	• brukeropusreader - Bruker OPUS spectroscopy files
+	• bruker-utils - Helper functions for Bruker NMR data
+New Additions:
+	• SpeckTackle - Custom JavaScript charting library specifically for spectroscopy in life sciences (supports MS, IR, NMR, UV-Vis)
+	• spc-reader - Thermo/Galactic SPC binary format
+	• andi-reader - AIA NetCDF format for analytical chemistry
+	• jws2txt - JASCO file to text converter
+	• beautifuljason - Python interface for JEOL NMR (could inspire JS implementation)
+🌌 Astronomy & Astrophysics
+JavaScript/Web-Based:
+	• astronomy-js (astronomy.js) - Astronomical calculations (celestial coordinates, ephemeris, altitude/azimuth)
+	• AstroJS - Mentioned in tutorials for astronomical data visualization
+	• colmarvista - Web-based NMR viewer (JavaScript)
+	• JSpecView - Java library for JCAMP-DX spectra (could be ported/interfaced)
+Related (Python but worth knowing):
+	• exoplanet - Fast MCMC for exoplanet analysis (time-series, transits, radial velocities)
+	• starry - Tools for mapping stars and planets
+	• everest - K2 light curve de-trending
+	• ldtk - Stellar limb darkening profiles
+🪐 Exoplanet Analysis Tools
+	• PandExo - Transiting exoplanet science (JWST & HST simulator)
+	• triceratops - Rating exoplanet candidates and reliability analysis
+	• planetplanet - Photodynamical code for exoplanet light curves
+	• ExoJulia - Julia package for fast exoplanet modeling (could inspire JS port)
+📊 Scientific Data Format Parsers
+HDF5/NetCDF:
+	• h5wasm - HDF5 for WebAssembly (JavaScript access to HDF5)
+	• netcdfjs - Pure JavaScript NetCDF reader
+	• jdataview - Binary data reading in JavaScript
+	• pako - JavaScript compression library (for compressed formats)
+XML-Based Formats:
+	• Native browser XML parsing + custom parsers for: 
+		○ AnIML (Analytical Information Markup Language)
+		○ mzML (mass spectrometry)
+		○ nmrML (NMR data)
+Generic:
+	• xlsx / exceljs - Better Excel parsing than current code
+	• csv-parse - Streaming CSV parser for huge files
+	• fast-csv - Alternative high-performance CSV parser
+🧪 Chemistry-Specific
+Spectroscopy Data:
+	• cheminfo - Suite of JavaScript chemistry tools (includes NMR processing)
+	• nmredata - NMReDATA format handling
+	• mdl-molfile-parser - MDL Molfile structure parsing (your app already has this!)
+	• openbabel-node - Node.js bindings for Open Babel chemistry toolkit
+Molecular Visualization:
+	• 3Dmol.js - Molecular visualization in WebGL
+	• Kekule.js - JavaScript library for chemoinformatics
+	• ChemDoodleWeb - Chemistry graphics and cheminformatics (commercial but powerful)
+📈 Data Processing & Analysis
+Mathematics/Statistics:
+	• mathjs - Comprehensive math library
+	• simple-statistics - Statistical functions
+	• regression-js - Regression analysis
+	• ml-matrix - Matrix operations for scientific computing
+	• fft.js - Fast Fourier Transform (crucial for spectroscopy!)
+	• dsp.js - Digital signal processing
+Peak Detection & Analysis:
+	• ml-peak-shape-generator - Peak shape generation and fitting
+	• ml-spectra-processing - Spectral data processing (peak picking, baseline correction)
+	• ml-savitzky-golay - Smoothing filter for spectroscopy
+	• ml-regression - Various regression algorithms
+🎨 Visualization Libraries
+Charting (Beyond D3):
+	• Plotly.js - Interactive scientific charts (supports spectroscopy-style plots)
+	• Chart.js - Simple but powerful charting
+	• Apache ECharts - Feature-rich visualization library
+	• Highcharts - Professional charting (commercial license for commercial use)
+Specialized:
+	• SpeckTackle (mentioned above) - Purpose-built for spectroscopy
+	• WebGL-based renderers for large datasets
+🛰️ NASA & Government Open Source
+From NASA's code.gov:
+	• Visual Environment for Remote Virtual Exploration (VERVE) - 3D visualization system
+	• Neo-Geography Toolkit (NGT) - Remote sensing data processing
+	• Mission Simulation Toolkit (MST) - High-fidelity simulation framework
+🔧 Utility Libraries
+File Handling:
+	• file-type - Detect file types from buffers
+	• iconv-lite - Character encoding conversion
+	• buffer - Node.js buffer for binary data
+Compression:
+	• pako - Zlib port for JavaScript (gzip, deflate)
+	• lz-string - String compression
+	• compressjs - Various compression algorithms
+🌐 Format-Specific Recommendations
+For Your Application Specifically:
+	1. JCAMP-DX (highest priority)
+		○ jcamp npm package
+		○ Custom validators based on IUPAC specifications
+	2. FITS (astronomy)
+		○ fitsjs (astrojs implementation)
+		○ Client-side FITS header parsing
+	3. HDF5 (modern standard)
+		○ h5wasm for browser-based access
+		○ Server-side Node.js HDF5 bindings
+	4. NetCDF (meteorology/oceanography)
+		○ netcdfjs
+		○ ANDI-MS NetCDF variant support
+	5. Vendor Formats (Bruker, Perkin Elmer, etc.)
+		○ brukeropusreader for Bruker
+		○ Custom parsers for each vendor (opportunity for community contribution!)
+	6. NMR-Specific
+		○ NMReDATA format support
+		○ Bruker FID raw data
+		○ nmrML for metabolomics
+	7. Mass Spectrometry
+		○ mzML parser (XML-based, use native XML + schema validation)
+		○ mzXML legacy support
+
+🎯 Prioritized Implementation Roadmap
+Phase 1: Critical Enhancements
+	1. papaparse - Replace custom CSV parsing immediately
+	2. jcamp - Add JCAMP-DX support (widely used standard)
+	3. fitsjs - FITS support for astronomical data
+	4. fft.js - Fourier transform capabilities
+	5. ml-spectra-processing - Peak detection and baseline correction
+
+---
+IMPLEMENTED (short notes):
+- papaparse: Integrated as the main CSV/TSV parser used by `apps/web/src/app/api/utils/parsers.js`.
+- jcamp: Added async support for JCAMP parsing (uses `jcamp` package when available; falls back to a safe error state if not installed).
+- Added tests: `apps/web/test/parsers.test.ts` validates CSV/TSV and JCAMP behavior.
+- Python scaffolding: `tools/python/parsers/requirements.txt` and `parse_jcamp.py` added to follow the recommended Python expansion.
+
+Phase 2: Format Expansion
+	1. netcdfjs - NetCDF format support
+	2. h5wasm - HDF5 browser support
+	3. xlsx/exceljs - Better Excel handling
+	4. brukeropusreader - Vendor format support
+Phase 3: Advanced Features
+	1. SpeckTackle concepts - Enhance charting capabilities
+	2. ml-peak-shape-generator - Advanced peak fitting
+	3. 3Dmol.js - Molecular structure visualization
+	4. Plotly.js - Interactive 3D spectral visualization
+
+💡 Key Insights from Research
+	1. JCAMP-DX is king - Most vendors support it, IUPAC standard
+	2. HDF5 is the future - Modern, efficient, self-describing
+	3. Vendor lock-in is real - Many proprietary formats need reverse engineering
+	4. Web standards matter - XML/JSON-based formats have better tool support
+	5. Community is fragmented - Different tools for different spectroscopy types

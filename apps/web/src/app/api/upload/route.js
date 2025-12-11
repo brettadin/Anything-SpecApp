@@ -17,31 +17,37 @@ export const config = {
   },
 };
 
+import { parseTextFile } from '@/app/api/utils/parsers';
+
 // Smart file parser that handles different formats and extracts metadata
-function parseFileContent(content, filename) {
-  const notes = [];
-  let detectedFormat = "unknown";
-  let hasHeaders = false;
-  let delimiter = ",";
-  let rows = [];
-  let columnNames = [];
-  let metadataRows = []; // Store metadata lines
-  let spectralMetadata = {}; // Parsed key-value metadata
-  let xColumn = null;
-  let yColumns = [];
-  let xRange = null;
-  let yRange = null;
-  let dataStartRow = 0;
-
+async function parseFileContent(content, filename) {
+  // Delegate to parsers utility (uses papaparse and jcamp where possible)
   try {
-    const ext = filename.toLowerCase().split(".").pop();
-    notes.push(`File extension: ${ext}`);
-
-    const imageExts = ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "img"];
-    if (imageExts.includes(ext)) {
-      notes.push(`Image files (${ext}) are not supported for data parsing`);
+    const result = await parseTextFile(content, filename);
+    // Keep compatibility with previous structure by ensuring keys exist
+    return {
+      detectedFormat: result.detectedFormat || 'unknown',
+      hasHeaders: result.hasHeaders || false,
+      delimiter: result.delimiter || null,
+      columnNames: result.columnNames || [],
+      rows: result.rows || [],
+      notes: result.notes || [],
+      metadataRows: result.metadataRows || [],
+      spectralMetadata: result.spectralMetadata || {},
+      xColumn: result.xColumn || null,
+      yColumns: result.yColumns || [],
+      xRange: result.xRange || null,
+      yRange: result.yRange || null,
+      dataStartRow: result.dataStartRow || 0,
+    };
+  } catch (err) {
+    console.error('Parser utility failed, falling back to legacy parser:', err);
+    // Fallback: minimal legacy behavior (very small subset)
+    const notes = [`Fallback legacy parser used due to: ${err.message}`];
+    const lines = content.split(/\r?\n/).filter(Boolean);
+    if (lines.length === 0) {
       return {
-        detectedFormat: "unsupported-image",
+        detectedFormat: 'empty',
         hasHeaders: false,
         delimiter: null,
         columnNames: [],
@@ -57,447 +63,35 @@ function parseFileContent(content, filename) {
       };
     }
 
-    if (ext === "fits" || ext === "fit") {
-      notes.push(
-        "FITS files require special binary parsing (not yet implemented)",
-      );
-      return {
-        detectedFormat: "fits-binary",
-        hasHeaders: false,
-        delimiter: null,
-        columnNames: [],
-        rows: [],
-        notes,
-        metadataRows: [],
-        spectralMetadata: {},
-        xColumn: null,
-        yColumns: [],
-        xRange: null,
-        yRange: null,
-        dataStartRow: 0,
-      };
-    }
-
-    if (ext === "json") {
-      try {
-        const jsonData = JSON.parse(content);
-        detectedFormat = "json";
-        if (Array.isArray(jsonData)) {
-          rows = jsonData;
-          if (rows.length > 0 && typeof rows[0] === "object") {
-            columnNames = Object.keys(rows[0]);
-            hasHeaders = true;
-          }
-        } else if (typeof jsonData === "object") {
-          columnNames = Object.keys(jsonData);
-          rows = [jsonData];
-          hasHeaders = true;
-        }
-        notes.push("Successfully parsed as JSON");
-        return {
-          detectedFormat,
-          hasHeaders,
-          delimiter: null,
-          columnNames,
-          rows,
-          notes,
-          metadataRows: [],
-          spectralMetadata: {},
-          xColumn: null,
-          yColumns: [],
-          xRange: null,
-          yRange: null,
-          dataStartRow: 0,
-        };
-      } catch (err) {
-        notes.push(
-          `JSON parse failed: ${err.message}, trying as delimited text`,
-        );
-      }
-    }
-
-    const lines = content.split(/\r?\n/);
-    notes.push(`Total lines in file: ${lines.length}`);
-
-    const nonEmptyLines = lines.filter((line) => line.trim());
-    notes.push(`Non-empty lines: ${nonEmptyLines.length}`);
-
-    if (nonEmptyLines.length === 0) {
-      notes.push("File appears to be empty");
-      return {
-        detectedFormat: "empty",
-        hasHeaders: false,
-        delimiter: null,
-        columnNames: [],
-        rows: [],
-        notes,
-        metadataRows: [],
-        spectralMetadata: {},
-        xColumn: null,
-        yColumns: [],
-        xRange: null,
-        yRange: null,
-        dataStartRow: 0,
-      };
-    }
-
-    // NEW: Smarter delimiter detection - test against NUMERIC lines, not metadata
-    const delimiters = [",", "\t", ";", "|", " "];
-    let bestDelimiter = ",";
-    let maxColumns = 0;
-
-    // Find lines that look like numeric data (not metadata text)
-    const numericLineIndices = [];
-    for (let i = 0; i < Math.min(50, lines.length); i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      // Skip obvious comment lines
-      if (
-        line.startsWith("#") ||
-        line.startsWith("//") ||
-        line.startsWith("%") ||
-        line.startsWith("!")
-      ) {
-        continue;
-      }
-
-      // Check if line has numbers - simple heuristic: contains digits and spaces/delimiters
-      const hasNumbers = /\d/.test(line);
-      const parts = line.split(/[\s,\t;|]+/);
-      const numericParts = parts.filter(
-        (p) => !isNaN(parseFloat(p)) && p.trim() !== "",
-      ).length;
-
-      // If most parts are numeric, this is likely a data line
-      if (hasNumbers && numericParts >= 2) {
-        numericLineIndices.push(i);
-      }
-    }
-
-    notes.push(
-      `Found ${numericLineIndices.length} potential data lines in first 50 lines`,
-    );
-
-    // Test delimiters on numeric lines
-    if (numericLineIndices.length > 0) {
-      const delimiterScores = {};
-
-      for (const testDelim of delimiters) {
-        const columnCounts = numericLineIndices.slice(0, 10).map((idx) => {
-          const line = lines[idx].trim();
-          // For space delimiter, split on multiple spaces to avoid splitting numbers
-          if (testDelim === " ") {
-            return line.split(/\s+/).filter((p) => p).length;
-          }
-          return line.split(testDelim).filter((p) => p.trim()).length;
-        });
-
-        // Calculate consistency - how often do we get the same column count?
-        const mode = columnCounts
-          .sort(
-            (a, b) =>
-              columnCounts.filter((v) => v === a).length -
-              columnCounts.filter((v) => v === b).length,
-          )
-          .pop();
-
-        const consistency =
-          columnCounts.filter((c) => c === mode).length / columnCounts.length;
-        const avgCols = mode;
-
-        delimiterScores[testDelim] = { avgCols, consistency };
-      }
-
-      // Pick delimiter with best combination of column count and consistency
-      let bestScore = 0;
-      for (const [delim, score] of Object.entries(delimiterScores)) {
-        const totalScore = score.avgCols * score.consistency;
-        if (totalScore > bestScore && score.avgCols >= 2) {
-          bestScore = totalScore;
-          bestDelimiter = delim;
-          maxColumns = score.avgCols;
-        }
-      }
-
-      notes.push(
-        `Best delimiter: "${bestDelimiter === "\t" ? "\\t" : bestDelimiter === " " ? "space" : bestDelimiter}" with ${maxColumns} columns (consistency: ${(delimiterScores[bestDelimiter].consistency * 100).toFixed(0)}%)`,
-      );
-    } else {
-      // Fallback to old method
-      for (const testDelim of delimiters) {
-        const testLine = nonEmptyLines[0];
-        const testCols = testLine.split(testDelim).length;
-        if (testCols > maxColumns) {
-          maxColumns = testCols;
-          bestDelimiter = testDelim;
-        }
-      }
-    }
-
-    delimiter = bestDelimiter;
-
-    detectedFormat =
-      delimiter === "\t"
-        ? "tsv"
-        : delimiter === ";"
-          ? "semicolon-separated"
-          : delimiter === "|"
-            ? "pipe-separated"
-            : delimiter === " "
-              ? "space-separated"
-              : "csv";
-
-    // Find where actual data starts (skip metadata/comments)
-    dataStartRow = 0;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (!line) {
-        continue;
-      }
-
-      // Check for spectral data markers
-      if (
-        line.includes(">>>>>") ||
-        line.includes("<<<<<") ||
-        line.toLowerCase().includes("begin")
-      ) {
-        notes.push(`Found data marker at line ${i + 1}`);
-        metadataRows.push({ line: i + 1, content: line, type: "marker" });
-        continue;
-      }
-
-      // Skip common comment markers
-      if (
-        line.startsWith("#") ||
-        line.startsWith("//") ||
-        line.startsWith("%") ||
-        line.startsWith("!")
-      ) {
-        notes.push(`Comment line ${i + 1}`);
-        metadataRows.push({ line: i + 1, content: line, type: "comment" });
-        continue;
-      }
-
-      // Parse potential key-value metadata
-      const colonMatch = line.match(/^([^:]+):(.+)$/);
-      if (colonMatch) {
-        const key = colonMatch[1].trim();
-        const value = colonMatch[2].trim();
-        spectralMetadata[key] = value;
-        metadataRows.push({
-          line: i + 1,
-          content: line,
-          type: "key-value",
-          key,
-          value,
-        });
-        notes.push(`Metadata: ${key} = ${value}`);
-        continue;
-      }
-
-      // NEW: Check if this line is metadata text (mostly words, not numbers)
-      const parts =
-        delimiter === " " ? line.split(/\s+/) : line.split(delimiter);
-      const cleanParts = parts.map((p) => p.trim()).filter((p) => p);
-
-      if (cleanParts.length >= 2) {
-        const numericParts = cleanParts.filter(
-          (p) => !isNaN(parseFloat(p)) && p !== "",
-        ).length;
-        const numericRatio = numericParts / cleanParts.length;
-
-        // If less than 50% numeric and contains text words, treat as metadata
-        if (
-          numericRatio < 0.5 &&
-          cleanParts.some((p) => /[a-zA-Z]{2,}/.test(p))
-        ) {
-          // This looks like metadata text, not data
-          notes.push(
-            `Metadata text at line ${i + 1}: ${line.substring(0, 60)}${line.length > 60 ? "..." : ""}`,
-          );
-          metadataRows.push({ line: i + 1, content: line, type: "text" });
-
-          // Try to extract key-value if possible
-          if (cleanParts.length === 2) {
-            spectralMetadata[cleanParts[0]] = cleanParts[1];
-          }
-          continue;
-        }
-
-        // This line has enough columns and numeric data - likely start of data
-        if (cleanParts.length >= 2 && numericRatio >= 0.5) {
-          dataStartRow = i;
-          notes.push(`Data starts at line ${i + 1}`);
-          break;
-        }
-      }
-
-      // Single value or weird format - treat as metadata
-      metadataRows.push({ line: i + 1, content: line, type: "other" });
-    }
-
-    if (dataStartRow >= lines.length) {
-      notes.push("No valid data rows found after metadata");
-      return {
-        detectedFormat,
-        hasHeaders: false,
-        delimiter,
-        columnNames: [],
-        rows: [],
-        notes,
-        metadataRows,
-        spectralMetadata,
-        xColumn: null,
-        yColumns: [],
-        xRange: null,
-        yRange: null,
-        dataStartRow,
-      };
-    }
-
-    // Try to detect if first data row is a header
-    const firstDataLine = lines[dataStartRow].trim();
-    const firstCols = (
-      delimiter === " "
-        ? firstDataLine.split(/\s+/)
-        : firstDataLine.split(delimiter)
-    )
-      .map((c) => c.trim())
-      .filter((c) => c);
-
-    hasHeaders = false;
-    if (dataStartRow + 1 < lines.length) {
-      const secondLine = lines[dataStartRow + 1].trim();
-      if (secondLine) {
-        const secondCols = (
-          delimiter === " "
-            ? secondLine.split(/\s+/)
-            : secondLine.split(delimiter)
-        )
-          .map((c) => c.trim())
-          .filter((c) => c);
-
-        const firstNumCount = firstCols.filter(
-          (c) => !isNaN(parseFloat(c)) && c !== "",
-        ).length;
-        const secondNumCount = secondCols.filter(
-          (c) => !isNaN(parseFloat(c)) && c !== "",
-        ).length;
-
-        if (
-          firstNumCount < secondNumCount &&
-          secondNumCount >= firstCols.length / 2
-        ) {
-          hasHeaders = true;
-          notes.push(
-            "Detected header row (first row has text, second has numbers)",
-          );
-        }
-      }
-    }
-
-    if (!hasHeaders) {
-      const hasNoNumbers = firstCols.every(
-        (c) => isNaN(parseFloat(c)) || c === "",
-      );
-      if (hasNoNumbers && firstCols.length > 1) {
-        hasHeaders = true;
-        notes.push("Detected header row (all text labels)");
-      }
-    }
-
-    // Parse data rows
-    const startRow = hasHeaders ? dataStartRow + 1 : dataStartRow;
-    columnNames = hasHeaders
-      ? firstCols
-      : firstCols.map((_, i) => `Column_${i + 1}`);
-
-    notes.push(`Column names: ${columnNames.join(", ")}`);
-
-    for (let i = startRow; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
-
-      const values = (
-        delimiter === " " ? line.split(/\s+/) : line.split(delimiter)
-      )
-        .map((v) => v.trim())
-        .filter((v) => v);
-      const row = {};
-
-      columnNames.forEach((colName, idx) => {
-        const val = values[idx] || "";
-        const numVal = parseFloat(val);
-        row[colName] = !isNaN(numVal) && val !== "" ? numVal : val;
+    const delim = lines[0].includes('\t') ? '\t' : lines[0].includes(',') ? ',' : ',';
+    const cols = lines[0].split(delim).map((c) => c.trim());
+    const rows = lines.slice(1).map((l) => {
+      const vals = l.split(delim).map((v) => v.trim());
+      const obj = {};
+      cols.forEach((c, i) => {
+        const num = parseFloat(vals[i]);
+        obj[c] = !isNaN(num) ? num : vals[i] || '';
       });
+      return obj;
+    });
 
-      rows.push(row);
-    }
-
-    notes.push(`Successfully parsed ${rows.length} data rows`);
-
-    // Detect X and Y columns (spectral data detection)
-    if (rows.length > 0 && columnNames.length >= 2) {
-      const xIndicators = [
-        "wavelength",
-        "wave",
-        "wl",
-        "lambda",
-        "nm",
-        "wavenumber",
-        "cm-1",
-        "frequency",
-        "freq",
-        "hz",
-      ];
-      const yIndicators = [
-        "intensity",
-        "flux",
-        "transmission",
-        "absorbance",
-        "counts",
-        "%t",
-        "reflectance",
-      ];
-
-      for (let i = 0; i < columnNames.length; i++) {
-        const colName = columnNames[i].toLowerCase();
-        if (xIndicators.some((ind) => colName.includes(ind))) {
-          xColumn = columnNames[i];
-          notes.push(`Detected X column (wavelength/frequency): ${xColumn}`);
-          break;
-        }
-      }
-
-      if (!xColumn && rows.length > 2) {
-        const firstColValues = rows.slice(0, 10).map((r) => r[columnNames[0]]);
-        const isNumeric = firstColValues.every((v) => typeof v === "number");
-        if (isNumeric) {
-          const isIncreasing = firstColValues.every(
-            (v, i) => i === 0 || v > firstColValues[i - 1],
-          );
-          const isDecreasing = firstColValues.every(
-            (v, i) => i === 0 || v < firstColValues[i - 1],
-          );
-          if (isIncreasing || isDecreasing) {
-            xColumn = columnNames[0];
-            notes.push(
-              `Assuming first column is X (wavelength/frequency): ${xColumn} (monotonic ${isIncreasing ? "increasing" : "decreasing"})`,
-            );
-          }
-        }
-      }
-
-      yColumns = columnNames.filter((col, idx) => {
-        if (col === xColumn) return false;
-        const sampleValues = rows.slice(0, 10).map((r) => r[col]);
-        const isNumeric = sampleValues.every((v) => typeof v === "number");
-        return isNumeric;
-      });
-
-      if (yColumns.length > 0) {
+    return {
+      detectedFormat: delim === '\t' ? 'tsv' : 'csv',
+      hasHeaders: true,
+      delimiter: delim,
+      columnNames: cols,
+      rows,
+      notes,
+      metadataRows: [],
+      spectralMetadata: {},
+      xColumn: null,
+      yColumns: [],
+      xRange: null,
+      yRange: null,
+      dataStartRow: 1,
+    };
+  }
+}
         notes.push(`Detected Y columns (intensity): ${yColumns.join(", ")}`);
       }
 
@@ -628,7 +222,7 @@ export async function POST(request) {
 
     // Parse the file
     console.log("Starting file parsing...");
-    const parsed = parseFileContent(textContent, filename);
+    const parsed = await parseFileContent(textContent, filename);
     console.log(
       `Parsing complete: ${parsed.rows.length} rows, ${parsed.columnNames.length} columns, format: ${parsed.detectedFormat}`,
     );

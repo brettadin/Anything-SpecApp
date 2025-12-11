@@ -4,7 +4,13 @@
 	"type": "module",
 	"scripts": {
 		"dev": "react-router dev",
+		"test": "vitest",
+		"test:watch": "vitest --watch",
 		"typecheck": "react-router typegen && tsc --noEmit"
+	},
+	"dependencies": {
+		"papaparse": "^5.4.1",
+		"jcamp": "^1.0.4"
 	},
 	"dependencies": {
 		"@auth/core": "^0.37.2",

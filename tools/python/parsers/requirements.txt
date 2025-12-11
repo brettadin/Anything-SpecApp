@@ -1,0 +1,6 @@
+numpy
+h5py
+scipy
+jcamp
+pandas
+# Add more scientific libraries as needed (e.g., ml-spectra-processing, fftpack)
