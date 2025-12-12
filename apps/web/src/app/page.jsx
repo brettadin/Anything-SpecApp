@@ -100,8 +100,18 @@ export default function HomePage() {
 
       const result = await response.json();
 
-      // Redirect to file viewer
-      window.location.href = `/file/${result.fileId}`;
+      // Check if this is a spectral data file (CSV, TSV, or JCAMP)
+      const spectralExtensions = ['.csv', '.tsv', '.jdx', '.dx', '.jcamp'];
+      const isSpectralFile = spectralExtensions.some(ext => 
+        file.name.toLowerCase().endsWith(ext)
+      );
+
+      // Redirect to appropriate viewer
+      if (isSpectralFile && result.fileId) {
+        window.location.href = `/spectral/${result.fileId}`;
+      } else {
+        window.location.href = `/file/${result.fileId}`;
+      }
     } catch (err) {
       console.error("Upload error:", err);
       setError(err.message || "Failed to upload file. Please try again.");

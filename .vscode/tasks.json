@@ -1,0 +1,82 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "npm: dev (apps/web)",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "--prefix",
+                "apps/web",
+                "run",
+                "dev"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*(npm run dev|react-router dev).*$",
+                    "endsPattern": "^.*(Local:|Network:|ready in).*$"
+                }
+            }
+        },
+        {
+            "label": "npm: test (apps/web)",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "--prefix",
+                "apps/web",
+                "exec",
+                "vitest",
+                "--",
+                "--run"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$tsc"
+            ]
+        },
+        {
+            "label": "npm: test:watch (apps/web)",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "--prefix",
+                "apps/web",
+                "test"
+            ],
+            "isBackground": true,
+            "problemMatcher": {
+                "pattern": {
+                    "regexp": "^.*$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "^.*(vitest).*$",
+                    "endsPattern": "^.*(Test Files|waiting for changes).*$"
+                }
+            }
+        },
+        {
+            "label": "npm: typecheck (apps/web)",
+            "type": "shell",
+            "command": "npm",
+            "args": [
+                "--prefix",
+                "apps/web",
+                "run",
+                "typecheck"
+            ],
+            "problemMatcher": [
+                "$tsc"
+            ]
+        }
+    ]
+}

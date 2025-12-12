@@ -1,1 +1,1 @@
-{"version":"3.2.4","results":[[":test/parsers.test.ts",{"duration":0,"failed":true}]]}
+{"version":"3.2.4","results":[[":test/parsers.test.ts",{"duration":8.463199999999688,"failed":false}],[":test/integration.test.ts",{"duration":35.17509999999993,"failed":false}],[":test/spectral-analysis.test.ts",{"duration":5.476000000000113,"failed":false}]]}

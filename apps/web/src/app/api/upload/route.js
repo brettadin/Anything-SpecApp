@@ -92,66 +92,6 @@ async function parseFileContent(content, filename) {
     };
   }
 }
-        notes.push(`Detected Y columns (intensity): ${yColumns.join(", ")}`);
-      }
-
-      if (xColumn) {
-        const xValues = rows
-          .map((r) => r[xColumn])
-          .filter((v) => typeof v === "number");
-        if (xValues.length > 0) {
-          xRange = {
-            min: Math.min(...xValues),
-            max: Math.max(...xValues),
-            count: xValues.length,
-          };
-          notes.push(
-            `X range: ${xRange.min} to ${xRange.max} (${xRange.count} points)`,
-          );
-        }
-      }
-
-      if (yColumns.length > 0) {
-        const allYValues = [];
-        yColumns.forEach((yCol) => {
-          const yValues = rows
-            .map((r) => r[yCol])
-            .filter((v) => typeof v === "number");
-          allYValues.push(...yValues);
-        });
-        if (allYValues.length > 0) {
-          yRange = {
-            min: Math.min(...allYValues),
-            max: Math.max(...allYValues),
-            count: allYValues.length,
-          };
-          notes.push(
-            `Y range: ${yRange.min} to ${yRange.max} (${yRange.count} points)`,
-          );
-        }
-      }
-    }
-  } catch (err) {
-    notes.push(`Parsing error: ${err.message}`);
-    console.error("Parse error:", err);
-  }
-
-  return {
-    detectedFormat,
-    hasHeaders,
-    delimiter,
-    columnNames,
-    rows,
-    notes,
-    metadataRows,
-    spectralMetadata,
-    xColumn,
-    yColumns,
-    xRange,
-    yRange,
-    dataStartRow,
-  };
-}
 
 export async function POST(request) {
   const startTime = Date.now();

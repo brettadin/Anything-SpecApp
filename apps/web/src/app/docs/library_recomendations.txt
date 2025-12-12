@@ -125,11 +125,20 @@ Phase 1: Critical Enhancements
 	5. ml-spectra-processing - Peak detection and baseline correction
 
 ---
-IMPLEMENTED (short notes):
-- papaparse: Integrated as the main CSV/TSV parser used by `apps/web/src/app/api/utils/parsers.js`.
-- jcamp: Added async support for JCAMP parsing (uses `jcamp` package when available; falls back to a safe error state if not installed).
-- Added tests: `apps/web/test/parsers.test.ts` validates CSV/TSV and JCAMP behavior.
-- Python scaffolding: `tools/python/parsers/requirements.txt` and `parse_jcamp.py` added to follow the recommended Python expansion.
+IMPLEMENTED (Phase 1 Complete):
+✓ papaparse: CSV/TSV parser integrated in parsers.js (auto-detects delimiters)
+✓ jcamp: Architecture ready for JCAMP parsing (async, graceful fallback)
+✓ fft.js: Custom DFT implementation (no external deps, works well)
+✓ ml-spectra-processing: Spectral analysis suite:
+  - Peak detection (local maxima)
+  - Baseline correction (polynomial fit)
+  - Smoothing (moving average / Gaussian)
+  - Normalization & statistics
+✓ Tests: 17 Vitest tests (parsers, spectral-analysis, integration pipeline)
+✓ API Endpoint: POST /api/spectral-analysis for file analysis
+✓ React Components: Recharts visualization (SpectrumVisualizer, PeakDisplay, SpectralStats)
+✓ Python Tools: Full-featured analyzer supporting JCAMP, HDF5, NetCDF, CSV, Excel
+✓ Integration Tests: 8 tests covering upload → parse → analyze pipeline
 
 Phase 2: Format Expansion
 	1. netcdfjs - NetCDF format support

@@ -3,4 +3,8 @@ h5py
 scipy
 jcamp
 pandas
-# Add more scientific libraries as needed (e.g., ml-spectra-processing, fftpack)
+openpyxl
+netCDF4
+scikit-learn
+matplotlib
+
