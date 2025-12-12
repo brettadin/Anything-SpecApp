@@ -129,6 +129,16 @@ export async function action({ request }) {
         { status: 400 },
       );
     }
+    
+    // Limit data URL size to prevent memory issues (10MB max)
+    if (fileUrl.startsWith('data:') && fileUrl.length > 10 * 1024 * 1024) {
+      return Response.json(
+        {
+          error: `Data URL too large. Maximum size is 10MB. Your data URL is ${(fileUrl.length / 1024 / 1024).toFixed(1)}MB`,
+        },
+        { status: 400 },
+      );
+    }
 
     // Fetch the file content from the URL
     let textContent = "";
@@ -143,6 +153,12 @@ export async function action({ request }) {
       }
 
       const arrayBuffer = await fileResponse.arrayBuffer();
+      
+      // Safety check on buffer size
+      if (arrayBuffer.byteLength > 50 * 1024 * 1024) {
+        throw new Error(`File too large after decoding: ${(arrayBuffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+      }
+      
       const buffer = Buffer.from(arrayBuffer);
 
       console.log(`File fetched: ${buffer.length} bytes`);
@@ -211,11 +227,12 @@ export async function action({ request }) {
     console.log(
       `Preparing to store parsed data: ${fullDataToStore.length} rows (original: ${parsed.rows.length}), ${parsed.columnNames.length} columns`,
     );
+    // Skip stringification of large data to avoid memory issues
     console.log(
-      `Preview data size: ${JSON.stringify(previewData).length} bytes`,
+      `Preview data size: ~${previewData.length * 50} bytes (estimated)`,
     );
     console.log(
-      `Full data size: ${JSON.stringify(fullDataToStore).length} bytes`,
+      `Full data size: ~${fullDataToStore.length * 50} bytes (estimated)`,
     );
 
     try {

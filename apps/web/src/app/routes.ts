@@ -51,10 +51,24 @@ function buildRouteTree(dir: string, basePath = ''): Tree {
 		const stat = statSync(filePath);
 
 		if (stat.isDirectory()) {
-			const childPath = basePath ? `${basePath}/${file}` : file;
+			// Convert [param] to :param in the path when building tree
+			let childPath = basePath ? `${basePath}/${file}` : file;
+			
+			// Process parameter syntax in folder names
+			if (file.startsWith('[') && file.endsWith(']')) {
+				const paramName = file.slice(1, -1);
+				if (paramName.startsWith('...')) {
+					childPath = basePath ? `${basePath}/*` : '*';
+				} else if (paramName.startsWith('[') && paramName.endsWith(']')) {
+					childPath = basePath ? `${basePath}/:${paramName.slice(1, -1)}?` : `:${paramName.slice(1, -1)}?`;
+				} else {
+					childPath = basePath ? `${basePath}/:${paramName}` : `:${paramName}`;
+				}
+			}
+			
 			const childNode = buildRouteTree(filePath, childPath);
 			node.children.push(childNode);
-		} else if (file === 'page.jsx') {
+		} else if (file === 'page.jsx' || file === 'page.tsx') {
 			node.hasPage = true;
 		} else if (file === 'route.js' || file === 'route.ts') {
 			node.hasRoute = true;
@@ -68,37 +82,23 @@ function generateRoutes(node: Tree): RouteConfigEntry[] {
 	const routes: RouteConfigEntry[] = [];
 
 	if (node.hasPage) {
+		// Determine file extension - need to use the actual folder structure, not the processed path
+		const actualPath = node.path.replace(/:\w+\??|\*/g, (match) => {
+			// Convert :param back to [param], :param? to [[param]], * to [...param]
+			if (match === '*') return '[...param]';
+			if (match.endsWith('?')) return `[[${match.slice(1, -1)}]]`;
+			return `[${match.slice(1)}]`;
+		});
+		
+		const ext = require('fs').existsSync(join(__dirname, actualPath, 'page.tsx')) ? 'tsx' : 'jsx';
 		const componentPath =
-			node.path === '' ? `./${node.path}page.jsx` : `./${node.path}/page.jsx`;
+			actualPath === '' ? `./${actualPath}page.${ext}` : `./${actualPath}/page.${ext}`;
 
 		if (node.path === '') {
 			routes.push(index(componentPath));
 		} else {
-			// Handle parameter routes
-			let routePath = node.path;
-
-			// Replace all parameter segments in the path
-			const segments = routePath.split('/');
-			const processedSegments = segments.map((segment) => {
-				if (segment.startsWith('[') && segment.endsWith(']')) {
-					const paramName = segment.slice(1, -1);
-
-					// Handle catch-all parameters (e.g., [...ids] becomes *)
-					if (paramName.startsWith('...')) {
-						return '*'; // React Router's catch-all syntax
-					}
-					// Handle optional parameters (e.g., [[id]] becomes :id?)
-					if (paramName.startsWith('[') && paramName.endsWith(']')) {
-						return `:${paramName.slice(1, -1)}?`;
-					}
-					// Handle regular parameters (e.g., [id] becomes :id)
-					return `:${paramName}`;
-				}
-				return segment;
-			});
-
-			routePath = processedSegments.join('/');
-			routes.push(route(routePath, componentPath));
+			// Path is already processed with : syntax
+			routes.push(route(node.path, componentPath));
 		}
 	}
 	
@@ -115,7 +115,7 @@ function generateRoutes(node: Tree): RouteConfigEntry[] {
 	}
 
 	return routes;
-}
+}{jsx,tsx}
 if (import.meta.env.DEV) {
 	import.meta.glob('./**/page.jsx', {});
 	if (import.meta.hot) {
