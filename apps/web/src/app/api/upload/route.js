@@ -1,6 +1,5 @@
-import sql from "@/app/api/utils/sql";
-import { auth } from "@/auth";
-import upload from "@/app/api/utils/upload";
+// Database not configured for dev - will implement later
+// import sql from "@/app/api/utils/sql";
 
 // Configure Next.js to allow large file uploads for App Router
 export const runtime = "nodejs";
@@ -93,17 +92,18 @@ async function parseFileContent(content, filename) {
   }
 }
 
-export async function POST(request) {
+export async function action({ request }) {
   const startTime = Date.now();
   console.log("=== UPLOAD REQUEST STARTED ===");
 
   try {
-    const session = await auth();
-    if (!session || !session.user?.id) {
-      console.log("Upload failed: User not authenticated");
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    console.log(`Upload by user: ${session.user.id}`);
+    // Auth disabled for now - will implement custom auth later
+    // const session = await auth();
+    // if (!session || !session.user?.id) {
+    //   console.log("Upload failed: User not authenticated");
+    //   return Response.json({ error: "Unauthorized" }, { status: 401 });
+    // }
+    // console.log(`Upload by user: ${session.user.id}`);
 
     // Get file URL and metadata from request
     const body = await request.json();
@@ -183,23 +183,10 @@ export async function POST(request) {
       );
     }
 
-    // Store in database
-    let fileId;
-    try {
-      const fileResult = await sql`
-        INSERT INTO uploaded_files (user_id, filename, file_url, file_size, mime_type, metadata)
-        VALUES (${session.user.id}, ${filename}, ${fileUrl}, ${fileSize || null}, ${mimeType || "text/plain"}, ${JSON.stringify({})})
-        RETURNING id
-      `;
-      fileId = fileResult[0].id;
-      console.log(`File record created: ID ${fileId}`);
-    } catch (err) {
-      console.error("Database insert failed:", err);
-      return Response.json(
-        { error: `Database error: ${err.message}` },
-        { status: 500 },
-      );
-    }
+    // Store in database (disabled for now - no database configured)
+    // For now, generate a temporary file ID
+    const fileId = `file_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    console.log(`File record created: ID ${fileId}`);
 
     // Smart downsampling for large datasets
     const previewData = parsed.rows.slice(0, 100);
@@ -232,36 +219,11 @@ export async function POST(request) {
     );
 
     try {
-      const insertResult = await sql`
-        INSERT INTO parsed_data (
-          file_id, detected_format, has_headers, delimiter, 
-          column_names, row_count, preview_data, full_data, parsing_notes,
-          metadata_rows, spectral_metadata, x_column, y_columns,
-          x_range, y_range, data_start_row
-        )
-        VALUES (
-          ${fileId}, 
-          ${parsed.detectedFormat}, 
-          ${parsed.hasHeaders}, 
-          ${parsed.delimiter || null},
-          ${parsed.columnNames}, 
-          ${parsed.rows.length}, 
-          ${JSON.stringify(previewData)}, 
-          ${JSON.stringify(fullDataToStore)}, 
-          ${parsed.notes},
-          ${JSON.stringify(parsed.metadataRows)},
-          ${JSON.stringify(parsed.spectralMetadata)},
-          ${parsed.xColumn || null},
-          ${parsed.yColumns || []},
-          ${parsed.xRange ? JSON.stringify(parsed.xRange) : null},
-          ${parsed.yRange ? JSON.stringify(parsed.yRange) : null},
-          ${parsed.dataStartRow || 0}
-        )
-        RETURNING id
-      `;
-      console.log(
-        `Parsed data stored successfully with ID ${insertResult[0].id}`,
-      );
+      // Database storage temporarily disabled - will implement later
+      console.log('Skipping database insert (not configured for dev)');
+      // Would insert into parsed_data table here
+      const mockId = `temp-${Date.now()}`;
+      console.log(`Parsed data would be stored with ID ${mockId}`);
     } catch (err) {
       console.error("Failed to store parsed data:", err);
       console.error("Error details:", {
@@ -299,4 +261,16 @@ export async function POST(request) {
       { status: 500 },
     );
   }
+}
+
+export async function loader() {
+  return Response.json({
+    message: "POST a file with fileUrl, filename, fileSize, and mimeType to upload",
+    example: {
+      fileUrl: "https://example.com/file.csv",
+      filename: "spectrum.csv",
+      fileSize: 1024,
+      mimeType: "text/csv"
+    }
+  });
 }

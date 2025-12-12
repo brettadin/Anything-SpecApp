@@ -1,5 +1,16 @@
 import { useCallback } from 'react';
-import { signIn, signOut } from "@auth/create/react";
+// Auth removed - mock functions
+// import { signIn, signOut } from "@auth/create/react";
+
+const signIn = (provider, options) => {
+  console.warn('Auth not implemented - signIn called with', provider);
+  return Promise.resolve({ ok: false, error: 'Auth not configured' });
+};
+
+const signOut = (options) => {
+  console.warn('Auth not implemented - signOut called');
+  return Promise.resolve();
+};
 
 function useAuth() {
   const callbackUrl = typeof window !== 'undefined' 

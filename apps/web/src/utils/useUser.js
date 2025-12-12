@@ -1,6 +1,8 @@
 import * as React from 'react';
-import { useSession } from "@auth/create/react";
+// Auth removed - mock session
+// import { useSession } from "@auth/create/react";
 
+const useSession = () => ({ data: null, status: 'unauthenticated' });
 
 const useUser = () => {
   const { data: session, status } = useSession();
@@ -30,6 +32,6 @@ const useUser = () => {
   return { user, data: user, loading: status === 'loading' || (status === 'authenticated' && !user), refetch: refetchUser };
 };
 
-export { useUser }
+export { useUser };
 
 export default useUser;

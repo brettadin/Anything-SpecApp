@@ -1,30 +1,29 @@
 import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-  useAsyncError,
-  useLocation,
-  useRouteError,
+    Links,
+    Meta,
+    Outlet,
+    Scripts,
+    ScrollRestoration,
+    useAsyncError,
+    useLocation,
+    useRouteError,
 } from 'react-router';
 
 import { useButton } from '@react-aria/button';
 import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type FC,
-  Component,
+    Component,
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type ReactNode
 } from 'react';
 import './global.css';
 
-import { toPng } from 'html-to-image';
 import fetch from '@/__create/fetch';
-// @ts-ignore
-import { SessionProvider } from '@auth/create/react';
+import { toPng } from 'html-to-image';
+// Auth removed - SessionProvider not needed
+// import { SessionProvider } from '@auth/create/react';
 import { useNavigate } from 'react-router';
 import { serializeError } from 'serialize-error';
 import { Toaster } from 'sonner';
@@ -32,8 +31,8 @@ import { Toaster } from 'sonner';
 import { LoadFonts } from 'virtual:load-fonts.jsx';
 import { HotReloadIndicator } from '../__create/HotReload';
 import { useSandboxStore } from '../__create/hmr-sandbox-store';
-import type { Route } from './+types/root';
 import { useDevServerHeartbeat } from '../__create/useDevServerHeartbeat';
+import type { Route } from './+types/root';
 
 export const links = () => [];
 
@@ -479,9 +478,5 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  return (
-    <SessionProvider>
-      <Outlet />
-    </SessionProvider>
-  );
+  return <Outlet />;
 }

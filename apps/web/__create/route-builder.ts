@@ -1,8 +1,9 @@
+console.log('=== LOADING route-builder.ts ===');
+import { Hono } from 'hono';
+import type { Handler } from 'hono/types';
 import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Hono } from 'hono';
-import type { Handler } from 'hono/types';
 import updatedFetch from '../src/__create/fetch';
 
 const API_BASENAME = '/api';
@@ -89,6 +90,7 @@ async function registerRoutes() {
           if (route[method]) {
             const parts = getHonoPath(routeFile);
             const honoPath = `/${parts.map(({ pattern }) => pattern).join('/')}`;
+            console.log(`Registering ${method} ${honoPath} from ${routeFile}`);
             const handler: Handler = async (c) => {
               const params = c.req.param();
               if (import.meta.env.DEV) {
@@ -132,7 +134,14 @@ async function registerRoutes() {
 }
 
 // Initial route registration
-await registerRoutes();
+console.log('Starting route registration...');
+try {
+  await registerRoutes();
+  console.log('Routes registered. Total routes:', api.routes?.length || 0);
+} catch (error) {
+  console.error('CRITICAL: Failed to register routes:', error);
+  console.error('Stack:', error instanceof Error ? error.stack : 'No stack trace');
+}
 
 // Hot reload routes in development
 if (import.meta.env.DEV) {
@@ -149,3 +158,4 @@ if (import.meta.env.DEV) {
 }
 
 export { api, API_BASENAME };
+
